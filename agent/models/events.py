@@ -8,3 +8,10 @@ class KeyboardEvent:
     event_type: str
     key: str
     source: str
+
+@dataclass
+class TextEvent:
+    timestamp: datetime
+    event_type: str
+    text: str
+    source: str
