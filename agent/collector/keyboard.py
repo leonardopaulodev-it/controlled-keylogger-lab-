@@ -8,69 +8,103 @@ from agent.storage.event_logger import EventLogger
 
 
 class KeyboardCollector(QWidget):
+    """Collects keyboard input inside the controlled window."""
+
+    SOURCE = "controlled-input-window"
+
     def __init__(self):
         super().__init__()
 
         self.text_buffer = ""
+        self.logger = EventLogger()
 
         self.setWindowTitle("Controlled Keyboard Lab")
         self.setMinimumSize(600, 400)
         self.setFocusPolicy(Qt.StrongFocus)
 
-        self.logger = EventLogger()
-
     def keyPressEvent(self, event):
+
         # Backspace
-        if event.key() == Qt.Key_Backspace :
-            print("BACKSPACE")
+        if event.key() == Qt.Key_Backspace:
+            self._handle_backspace(event)
+            return
 
-            keyboard_event = KeyboardEvent(
-                timestamp=datetime.now(),
-                event_type="key_press",
-                key="Backspace",
-                source="controlled-input-window"
-            )
-
-            self.logger.log(keyboard_event)
-            
-        
-        if event.key() == Qt.Key_Return:
-            print("ENTER")
-            
-
-            keyboard_event = KeyboardEvent(
-                timestamp=datetime.now(),
-                event_type="key_press",
-                key="ENTER",
-                source="controlled-input-window"
-            )
-
-            self.logger.log(keyboard_event)
-
-            event.accept()
+        # Enter
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            self._finish_input(event)
             return
 
         key = event.text()
 
-        # Espaço = terminou uma palavra
+        # Space
         if key == " ":
-            if self.text_buffer:
-                print(f"WORD: {self.text_buffer}")
+            self._finish_input(event)
+            return
 
-                word_event = KeyboardEvent(
-                    timestamp=datetime.now(),
-                    event_type="word",
-                    key=self.text_buffer,
-                    source="controlled-input-window"
-                )
+        # Letra
+        if key and key.isalpha():
+            self._handle_character(key)
 
-                self.logger.log(word_event)
+        event.accept()
 
-                self.text_buffer = ""
+    def _handle_character(self, key):
+        """Adiciona a letra ao buffer, sem a classificar ainda."""
 
-        # Letras ficam apenas no buffer
-        elif key:
-            self.text_buffer += key
-            print(f"BUFFER: {self.text_buffer}")
+        self.text_buffer += key
+
+        print(f"CARÁCTER: {key}")
+        print(f"BUFFER: {self.text_buffer}")
+
+    def _handle_backspace(self, event):
+        """Remove a última letra."""
+
+        print("BACKSPACE utilizado")
+
+        if self.text_buffer:
+            self.text_buffer = self.text_buffer[:-1]
+
+        print(f"BUFFER: {self.text_buffer}")
+
+        event.accept()
+
+    def _finish_input(self, event):
+        """Classifica o buffer quando aparece Space ou Enter."""
+
+        if not self.text_buffer:
+            event.accept()
+            return
+
+        text = self.text_buffer
+
+        # Uma única letra = LETTER
+        if len(text) == 1:
+
+            print(f"LETTER: {text}")
+
+            letter_event = KeyboardEvent(
+                timestamp=datetime.now(),
+                event_type="letter",
+                key=text,
+                source=self.SOURCE,
+            )
+
+            self.logger.log(letter_event)
+
+        # Duas ou mais letras = WORD
+        else:
+
+            print(f"WORD: {text}")
+
+            word_event = KeyboardEvent(
+                timestamp=datetime.now(),
+                event_type="word",
+                key=text,
+                source=self.SOURCE,
+            )
+
+            self.logger.log(word_event)
+
+        # Limpar depois de classificar
+        self.text_buffer = ""
 
         event.accept()
