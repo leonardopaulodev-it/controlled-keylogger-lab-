@@ -23,23 +23,55 @@ class KeyboardCollector(QTextEdit):
         self.logger = EventLogger()
         self.processor = EventProcessor()
 
-        self.setPlaceholderText(
-            "Escreve aqui..."
-        )
-
+        self.setPlaceholderText("Escreve aqui...")
         self.setMinimumHeight(100)
 
     def keyPressEvent(self, event) -> None:
-        """Handle keyboard input inside the controlled text area."""
+        """Handle keyboard input inside the controlled area."""
 
-        # Backspace
-        if event.key() == Qt.Key_Backspace:
-            self._handle_backspace()
+        key = event.key()
+
+        # -------------------------
+        # Modifier keys
+        # -------------------------
+
+        if key == Qt.Key_Control:
+            self._log_control_event(
+                EventType.CTRL,
+                "ctrl",
+            )
             event.accept()
             return
 
+        if key == Qt.Key_Shift:
+            self._log_control_event(
+                EventType.SHIFT,
+                "shift",
+            )
+            event.accept()
+            return
+
+        if key == Qt.Key_Alt:
+            self._log_control_event(
+                EventType.ALT,
+                "alt",
+            )
+            event.accept()
+            return
+
+        # -------------------------
+        # Backspace
+        # -------------------------
+
+        if key == Qt.Key_Backspace:
+            self._handle_backspace(event)
+            return
+
+        # -------------------------
         # Enter
-        if event.key() in (
+        # -------------------------
+
+        if key in (
             Qt.Key_Return,
             Qt.Key_Enter,
         ):
@@ -50,11 +82,16 @@ class KeyboardCollector(QTextEdit):
                 "enter",
             )
 
-            super().keyPressEvent(event)
+            self.clear()
+
+            event.accept()
             return
 
+        # -------------------------
         # Space
-        if event.key() == Qt.Key_Space:
+        # -------------------------
+
+        if key == Qt.Key_Space:
             self._finish_input()
 
             self._log_control_event(
@@ -62,27 +99,73 @@ class KeyboardCollector(QTextEdit):
                 "space",
             )
 
+            self.clear()
+
+            event.accept()
+            return
+
+        # -------------------------
+        # Tab
+        # -------------------------
+
+        if key == Qt.Key_Tab:
+            self._log_control_event(
+                EventType.TAB,
+                "tab",
+            )
+
+            event.accept()
+            return
+
+        # -------------------------
+        # Escape
+        # -------------------------
+
+        if key == Qt.Key_Escape:
+            self._log_control_event(
+                EventType.ESCAPE,
+                "escape",
+            )
+
+            event.accept()
+            return
+
+        # -------------------------
+        # Delete
+        # -------------------------
+
+        if key == Qt.Key_Delete:
+            self._log_control_event(
+                EventType.DELETE,
+                "delete",
+            )
+
             super().keyPressEvent(event)
             return
 
-        # Letras
-        key = event.text()
+        # -------------------------
+        # Letters
+        # -------------------------
 
-        if key and key.isalpha():
-            self.text_buffer += key
+        text = event.text()
 
+        if text and text.isalpha():
+            self.text_buffer += text
             super().keyPressEvent(event)
             return
 
-        # Outros caracteres normais
-        if key:
+        # -------------------------
+        # Other characters
+        # -------------------------
+
+        if text:
             super().keyPressEvent(event)
             return
 
         event.accept()
 
-    def _handle_backspace(self) -> None:
-        """Remove the last character from the current word."""
+    def _handle_backspace(self, event) -> None:
+        """Handle Backspace."""
 
         if self.text_buffer:
             self.text_buffer = self.text_buffer[:-1]
@@ -92,23 +175,10 @@ class KeyboardCollector(QTextEdit):
             "backspace",
         )
 
-        super().keyPressEvent(
-            self._create_backspace_event()
-        )
-
-    def _create_backspace_event(self):
-        """Create a Backspace key event."""
-
-        from PySide6.QtGui import QKeyEvent
-
-        return QKeyEvent(
-            QKeyEvent.KeyPress,
-            Qt.Key_Backspace,
-            Qt.NoModifier,
-        )
+        super().keyPressEvent(event)
 
     def _finish_input(self) -> None:
-        """Classify and persist the current word."""
+        """Classify and persist the current text."""
 
         if not self.text_buffer:
             return

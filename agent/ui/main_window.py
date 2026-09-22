@@ -1,10 +1,10 @@
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QPushButton,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from agent.collector.keyboard import KeyboardCollector
 from agent.models.events import EventType
+from agent.ui.database_view import DatabaseView
 
 
 class MainWindow(QMainWindow):
@@ -41,12 +42,12 @@ class MainWindow(QMainWindow):
 
         self._update_status(True)
 
-    # ---------------------------------------------------------
-    # Event handling
-    # ---------------------------------------------------------
+    # =========================================================
+    # EVENT HANDLING
+    # =========================================================
 
     def _handle_event(self, event) -> None:
-        """Handle a new keyboard event."""
+        """Handle a newly created keyboard event."""
 
         self.event_count += 1
 
@@ -85,12 +86,16 @@ class MainWindow(QMainWindow):
 
         self._update_counters()
 
-    # ---------------------------------------------------------
-    # UI
-    # ---------------------------------------------------------
+        # Se a database estiver aberta, atualiza-a.
+        if self.database_view is not None:
+            self.database_view._load_events()
+
+    # =========================================================
+    # MAIN UI
+    # =========================================================
 
     def _build_ui(self) -> None:
-        """Build the application interface."""
+        """Build the main application interface."""
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -108,12 +113,15 @@ class MainWindow(QMainWindow):
         sidebar.setFixedWidth(230)
 
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(20, 24, 20, 20)
+        sidebar_layout.setContentsMargins(
+            20,
+            24,
+            20,
+            20,
+        )
         sidebar_layout.setSpacing(8)
 
-        # Application name
-
-        app_title = QLabel("Keyboard AI")
+        app_title = QLabel("Keyboard Logger")
         app_title.setObjectName("app-title")
 
         app_subtitle = QLabel(
@@ -126,23 +134,37 @@ class MainWindow(QMainWindow):
 
         sidebar_layout.addSpacing(30)
 
-        # Navigation
+        self.overview_button = QPushButton(
+            "Overview"
+        )
+        self.overview_button.setObjectName(
+            "nav-active"
+        )
 
-        overview = QPushButton("Overview")
-        overview.setObjectName("nav-active")
+        self.live_button = QPushButton(
+            "Live events"
+        )
+        self.live_button.setObjectName(
+            "nav-button"
+        )
 
-        live_events = QPushButton("Live events")
-        live_events.setObjectName("nav-button")
+        self.database_button = QPushButton(
+            "Database"
+        )
+        self.database_button.setObjectName(
+            "nav-button"
+        )
 
-        database = QPushButton("Database")
-        database.setObjectName("nav-button")
+        sidebar_layout.addWidget(
+            self.overview_button
+        )
 
-        sidebar_layout.addWidget(overview)
-        
+
+        sidebar_layout.addWidget(
+            self.database_button
+        )
 
         sidebar_layout.addStretch()
-
-        # Connection
 
         connection = QLabel(
             "●  Connected"
@@ -160,7 +182,7 @@ class MainWindow(QMainWindow):
         root.addWidget(sidebar)
 
         # =====================================================
-        # MAIN AREA
+        # CONTENT
         # =====================================================
 
         content = QWidget()
@@ -168,11 +190,52 @@ class MainWindow(QMainWindow):
 
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(
-            34, 28, 34, 28
+            34,
+            28,
+            34,
+            28,
         )
-        content_layout.setSpacing(20)
+
+        content_layout.setSpacing(0)
 
         root.addWidget(content)
+
+        # =====================================================
+        # STACKED VIEWS
+        # =====================================================
+
+        self.pages = QStackedWidget()
+
+        self.overview_page = self._create_overview_page()
+
+        self.database_view = DatabaseView()
+
+        self.pages.addWidget(
+            self.overview_page
+        )
+
+        self.pages.addWidget(
+            self.database_view
+        )
+
+        content_layout.addWidget(
+            self.pages
+        )
+
+        self._apply_styles()
+
+    # =========================================================
+    # OVERVIEW PAGE
+    # =========================================================
+
+    def _create_overview_page(self) -> QWidget:
+        """Create the overview page."""
+
+        page = QWidget()
+
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(20)
 
         # -----------------------------------------------------
         # Header
@@ -180,8 +243,8 @@ class MainWindow(QMainWindow):
 
         header = QHBoxLayout()
 
-        header_text = QVBoxLayout()
-        header_text.setSpacing(3)
+        title_layout = QVBoxLayout()
+        title_layout.setSpacing(3)
 
         title = QLabel("Overview")
         title.setObjectName("page-title")
@@ -191,18 +254,24 @@ class MainWindow(QMainWindow):
         )
         subtitle.setObjectName("page-subtitle")
 
-        header_text.addWidget(title)
-        header_text.addWidget(subtitle)
+        title_layout.addWidget(title)
+        title_layout.addWidget(subtitle)
 
-        header.addLayout(header_text)
+        header.addLayout(title_layout)
         header.addStretch()
 
-        self.status_label = QLabel("Running")
-        self.status_label.setObjectName("status")
+        self.status_label = QLabel(
+            "● Running"
+        )
+        self.status_label.setObjectName(
+            "status-running"
+        )
 
-        header.addWidget(self.status_label)
+        header.addWidget(
+            self.status_label
+        )
 
-        content_layout.addLayout(header)
+        layout.addLayout(header)
 
         # -----------------------------------------------------
         # Statistics
@@ -231,39 +300,63 @@ class MainWindow(QMainWindow):
             "Controls",
         )
 
-        content_layout.addLayout(stats)
+        layout.addLayout(stats)
 
         # -----------------------------------------------------
-        # Input
+        # Live input
         # -----------------------------------------------------
 
         input_header = QHBoxLayout()
 
-        input_title = QLabel("Live input")
-        input_title.setObjectName("section-title")
+        input_title = QLabel(
+            "Live input"
+        )
+        input_title.setObjectName(
+            "section-title"
+        )
 
-        input_status = QLabel(
+        input_info = QLabel(
             "Events are captured only here"
         )
-        input_status.setObjectName("section-info")
-
-        input_header.addWidget(input_title)
-        input_header.addStretch()
-        input_header.addWidget(input_status)
-
-        content_layout.addLayout(input_header)
-
-        input_frame = QFrame()
-        input_frame.setObjectName("input-frame")
-
-        input_layout = QVBoxLayout(input_frame)
-        input_layout.setContentsMargins(
-            16, 14, 16, 14
+        input_info.setObjectName(
+            "section-info"
         )
 
-        input_layout.addWidget(self.collector)
+        input_header.addWidget(
+            input_title
+        )
 
-        content_layout.addWidget(input_frame)
+        input_header.addStretch()
+
+        input_header.addWidget(
+            input_info
+        )
+
+        layout.addLayout(input_header)
+
+        input_frame = QFrame()
+        input_frame.setObjectName(
+            "input-frame"
+        )
+
+        input_layout = QVBoxLayout(
+            input_frame
+        )
+
+        input_layout.setContentsMargins(
+            16,
+            14,
+            16,
+            14,
+        )
+
+        input_layout.addWidget(
+            self.collector
+        )
+
+        layout.addWidget(
+            input_frame
+        )
 
         # -----------------------------------------------------
         # Recent activity
@@ -278,10 +371,15 @@ class MainWindow(QMainWindow):
             "section-title"
         )
 
-        activity_header.addWidget(activity_title)
+        activity_header.addWidget(
+            activity_title
+        )
+
         activity_header.addStretch()
 
-        content_layout.addLayout(activity_header)
+        layout.addLayout(
+            activity_header
+        )
 
         self.event_table = QTableWidget()
 
@@ -308,37 +406,37 @@ class MainWindow(QMainWindow):
             True
         )
 
-        header_view = (
+        table_header = (
             self.event_table.horizontalHeader()
         )
 
-        header_view.setSectionResizeMode(
+        table_header.setSectionResizeMode(
             0,
             QHeaderView.ResizeToContents,
         )
 
-        header_view.setSectionResizeMode(
+        table_header.setSectionResizeMode(
             1,
             QHeaderView.ResizeToContents,
         )
 
-        header_view.setSectionResizeMode(
+        table_header.setSectionResizeMode(
             2,
             QHeaderView.Stretch,
         )
 
-        header_view.setSectionResizeMode(
+        table_header.setSectionResizeMode(
             3,
             QHeaderView.ResizeToContents,
         )
 
-        content_layout.addWidget(
+        layout.addWidget(
             self.event_table,
             1,
         )
 
         # -----------------------------------------------------
-        # Bottom bar
+        # Bottom
         # -----------------------------------------------------
 
         bottom = QHBoxLayout()
@@ -350,7 +448,9 @@ class MainWindow(QMainWindow):
             "database-status"
         )
 
-        bottom.addWidget(database_status)
+        bottom.addWidget(
+            database_status
+        )
 
         bottom.addStretch()
 
@@ -368,31 +468,41 @@ class MainWindow(QMainWindow):
             "primary-button"
         )
 
-        bottom.addWidget(self.stop_button)
-        bottom.addWidget(self.start_button)
+        bottom.addWidget(
+            self.stop_button
+        )
 
-        content_layout.addLayout(bottom)
+        bottom.addWidget(
+            self.start_button
+        )
 
-        self._apply_styles()
+        layout.addLayout(bottom)
 
-    # ---------------------------------------------------------
-    # Statistics
-    # ---------------------------------------------------------
+        return page
+
+    # =========================================================
+    # STATISTICS
+    # =========================================================
 
     def _create_stat(
         self,
         layout: QHBoxLayout,
         title: str,
     ) -> QLabel:
-        """Create a small statistic card."""
+        """Create a statistic card."""
 
         frame = QFrame()
         frame.setObjectName("stat")
 
         stat_layout = QVBoxLayout(frame)
+
         stat_layout.setContentsMargins(
-            16, 13, 16, 13
+            16,
+            13,
+            16,
+            13,
         )
+
         stat_layout.setSpacing(2)
 
         title_label = QLabel(title)
@@ -405,15 +515,24 @@ class MainWindow(QMainWindow):
             "stat-value"
         )
 
-        stat_layout.addWidget(title_label)
-        stat_layout.addWidget(value_label)
+        stat_layout.addWidget(
+            title_label
+        )
+
+        stat_layout.addWidget(
+            value_label
+        )
 
         layout.addWidget(frame)
 
         return value_label
 
+    # =========================================================
+    # COUNTERS
+    # =========================================================
+
     def _update_counters(self) -> None:
-        """Update session statistics."""
+        """Update session counters."""
 
         self.events_value.setText(
             str(self.event_count)
@@ -431,9 +550,9 @@ class MainWindow(QMainWindow):
             str(self.control_count)
         )
 
-    # ---------------------------------------------------------
-    # Events table
-    # ---------------------------------------------------------
+    # =========================================================
+    # EVENT TABLE
+    # =========================================================
 
     def add_event(
         self,
@@ -442,7 +561,7 @@ class MainWindow(QMainWindow):
         key: str,
         source: str,
     ) -> None:
-        """Add an event to the activity table."""
+        """Add an event to the live table."""
 
         row = self.event_table.rowCount()
 
@@ -466,9 +585,9 @@ class MainWindow(QMainWindow):
 
         self.event_table.scrollToBottom()
 
-    # ---------------------------------------------------------
-    # Buttons
-    # ---------------------------------------------------------
+    # =========================================================
+    # NAVIGATION
+    # =========================================================
 
     def _connect_signals(self) -> None:
         """Connect interface signals."""
@@ -481,8 +600,79 @@ class MainWindow(QMainWindow):
             self._stop_monitoring
         )
 
+        self.overview_button.clicked.connect(
+            self._show_overview
+        )
+
+        self.database_button.clicked.connect(
+            self._show_database
+        )
+
+    def _show_overview(self) -> None:
+        """Show overview page."""
+
+        self.pages.setCurrentWidget(
+            self.overview_page
+        )
+
+        self._set_active_button(
+            self.overview_button
+        )
+
+    def _show_live_events(self) -> None:
+        """Show the live events page."""
+
+        self.pages.setCurrentWidget(
+            self.overview_page
+        )
+
+        self._set_active_button(
+            self.live_button
+        )
+
+    def _show_database(self) -> None:
+        """Show the database page."""
+
+        self.pages.setCurrentWidget(
+            self.database_view
+        )
+
+        self.database_view._load_events()
+
+        self._set_active_button(
+            self.database_button
+        )
+
+    def _set_active_button(
+        self,
+        active_button: QPushButton,
+    ) -> None:
+
+        buttons = [
+            self.overview_button,
+            self.live_button,
+            self.database_button,
+        ]
+
+        for button in buttons:
+            if button is active_button:
+                button.setObjectName(
+                    "nav-active"
+                )
+            else:
+                button.setObjectName(
+                    "nav-button"
+                )
+
+            button.style().unpolish(button)
+            button.style().polish(button)
+
+    # =========================================================
+    # MONITORING
+    # =========================================================
+
     def _start_monitoring(self) -> None:
-        """Start the controlled input."""
+        """Enable the controlled input."""
 
         self.collector.setEnabled(True)
         self.collector.setFocus()
@@ -490,7 +680,7 @@ class MainWindow(QMainWindow):
         self._update_status(True)
 
     def _stop_monitoring(self) -> None:
-        """Stop the controlled input."""
+        """Disable the controlled input."""
 
         self.collector.setEnabled(False)
 
@@ -500,19 +690,22 @@ class MainWindow(QMainWindow):
         self,
         running: bool,
     ) -> None:
-        """Update the session status."""
+        """Update monitoring status."""
 
         if running:
             self.status_label.setText(
                 "● Running"
             )
+
             self.status_label.setObjectName(
                 "status-running"
             )
+
         else:
             self.status_label.setText(
                 "● Stopped"
             )
+
             self.status_label.setObjectName(
                 "status-stopped"
             )
@@ -520,16 +713,17 @@ class MainWindow(QMainWindow):
         self.status_label.style().unpolish(
             self.status_label
         )
+
         self.status_label.style().polish(
             self.status_label
         )
 
-    # ---------------------------------------------------------
-    # Style
-    # ---------------------------------------------------------
+    # =========================================================
+    # STYLES
+    # =========================================================
 
     def _apply_styles(self) -> None:
-        """Apply the application theme."""
+        """Apply the application stylesheet."""
 
         self.setStyleSheet(
             """
@@ -597,11 +791,7 @@ class MainWindow(QMainWindow):
                 font-size: 11px;
             }
 
-            /* Main */
-
-            QWidget#content {
-                background: #F4F1EA;
-            }
+            /* Page */
 
             QLabel#page-title {
                 font-size: 28px;
@@ -679,7 +869,7 @@ class MainWindow(QMainWindow):
                 selection-background-color: #D9D2F2;
             }
 
-            /* Table */
+            /* Tables */
 
             QTableWidget {
                 background: #FFFFFF;
