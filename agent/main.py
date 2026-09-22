@@ -2,13 +2,13 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from agent.collector.keyboard import KeyboardCollector
+from agent.ui.main_window import MainWindow
 
 
 def main():
     app = QApplication(sys.argv)
 
-    window = KeyboardCollector()
+    window = MainWindow()
     window.show()
 
     sys.exit(app.exec())

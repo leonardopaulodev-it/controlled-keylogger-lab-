@@ -1,97 +1,121 @@
 from datetime import datetime
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QTextEdit
 
 from agent.models.events import EventType, KeyboardEvent
 from agent.processor.event_processor import EventProcessor
 from agent.storage.event_logger import EventLogger
 
 
-class KeyboardCollector(QWidget):
-    """Collects keyboard input inside the controlled window."""
+class KeyboardCollector(QTextEdit):
+    """Controlled keyboard input area."""
+
+    event_created = Signal(object)
 
     SOURCE = "controlled-input-window"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
         self.text_buffer = ""
+
         self.logger = EventLogger()
         self.processor = EventProcessor()
 
-        self.setWindowTitle("Controlled Keyboard Lab")
-        self.setMinimumSize(600, 400)
-        self.setFocusPolicy(Qt.StrongFocus)
+        self.setPlaceholderText(
+            "Escreve aqui..."
+        )
 
-    def keyPressEvent(self, event):
+        self.setMinimumHeight(100)
+
+    def keyPressEvent(self, event) -> None:
+        """Handle keyboard input inside the controlled text area."""
 
         # Backspace
         if event.key() == Qt.Key_Backspace:
-            self._handle_backspace(event)
+            self._handle_backspace()
+            event.accept()
             return
 
         # Enter
-        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+        if event.key() in (
+            Qt.Key_Return,
+            Qt.Key_Enter,
+        ):
             self._finish_input()
-            self._log_control_event(EventType.ENTER, "enter")
-            event.accept()
+
+            self._log_control_event(
+                EventType.ENTER,
+                "enter",
+            )
+
+            super().keyPressEvent(event)
             return
 
         # Space
         if event.key() == Qt.Key_Space:
             self._finish_input()
-            self._log_control_event(EventType.SPACE, "space")
-            event.accept()
+
+            self._log_control_event(
+                EventType.SPACE,
+                "space",
+            )
+
+            super().keyPressEvent(event)
             return
 
+        # Letras
         key = event.text()
 
-        # Letra
         if key and key.isalpha():
-            self._handle_character(key)
-            event.accept()
+            self.text_buffer += key
+
+            super().keyPressEvent(event)
+            return
+
+        # Outros caracteres normais
+        if key:
+            super().keyPressEvent(event)
             return
 
         event.accept()
 
-    def _handle_character(self, key: str):
-        """Adiciona a letra ao buffer sem a classificar ainda."""
-
-        self.text_buffer += key
-
-        print(f"CARÁCTER: {key}")
-        print(f"BUFFER: {self.text_buffer}")
-
-    def _handle_backspace(self, event):
-        """Remove a última letra do buffer e regista o Backspace."""
-
-        print("BACKSPACE utilizado")
+    def _handle_backspace(self) -> None:
+        """Remove the last character from the current word."""
 
         if self.text_buffer:
             self.text_buffer = self.text_buffer[:-1]
-
-        print(f"BUFFER: {self.text_buffer}")
 
         self._log_control_event(
             EventType.BACKSPACE,
             "backspace",
         )
 
-        event.accept()
+        super().keyPressEvent(
+            self._create_backspace_event()
+        )
 
-    def _finish_input(self):
-        """Classifica e regista o conteúdo atual do buffer."""
+    def _create_backspace_event(self):
+        """Create a Backspace key event."""
+
+        from PySide6.QtGui import QKeyEvent
+
+        return QKeyEvent(
+            QKeyEvent.KeyPress,
+            Qt.Key_Backspace,
+            Qt.NoModifier,
+        )
+
+    def _finish_input(self) -> None:
+        """Classify and persist the current word."""
 
         if not self.text_buffer:
             return
 
         text = self.text_buffer
 
-        # O EventProcessor decide o tipo.
         event_type = self.processor.classify_text(text)
-
-        print(f"{event_type.value.upper()}: {text}")
 
         keyboard_event = KeyboardEvent(
             timestamp=datetime.now(),
@@ -101,18 +125,16 @@ class KeyboardCollector(QWidget):
         )
 
         self.logger.log(keyboard_event)
+        self.event_created.emit(keyboard_event)
 
-        # Limpar o buffer depois de processar.
         self.text_buffer = ""
 
     def _log_control_event(
         self,
         event_type: EventType,
         key: str,
-    ):
-        """Regista uma tecla de controlo como um evento."""
-
-        print(f"CONTROL: {key}")
+    ) -> None:
+        """Persist and emit a control event."""
 
         keyboard_event = KeyboardEvent(
             timestamp=datetime.now(),
@@ -122,3 +144,4 @@ class KeyboardCollector(QWidget):
         )
 
         self.logger.log(keyboard_event)
+        self.event_created.emit(keyboard_event)
